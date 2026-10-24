@@ -70,7 +70,7 @@ const ensureDefaultAdmin = async () => {
   console.log(`Created default admin: ${DEFAULT_ADMIN.email}`);
 };
 
-const displayOrderId = (id) => `#SW-${1000 + id}`;
+const displayOrderId = (id) => `SC-${String(id).padStart(4, '0')}`;
 
 const formatOrderItemsSummary = (items) =>
   items
@@ -248,31 +248,171 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await prisma.product.findMany({ include: { category: true } });
-    const formatted = products.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      stock: p.stock,
-      image: p.image,
-      category: p.category.name,
-      categoryId: p.categoryId
-    }));
+    const products = await prisma.product.findMany({
+      include: { category: true },
+      orderBy: { id: 'desc' }
+    });
+    const formatted = products.map(p => {
+      let gallery = [];
+      try {
+        gallery = p.images ? JSON.parse(p.images) : [];
+      } catch (e) {
+        gallery = [];
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        price: p.price,
+        stock: p.stock,
+        image: p.image || '/crochet_tote.jpg',
+        images: Array.isArray(gallery) && gallery.length > 0 ? gallery : [p.image || '/crochet_tote.jpg'],
+        category: p.category.name,
+        categoryId: p.categoryId,
+        rating: p.rating ?? 5.0,
+        allowCustomText: p.allowCustomText ?? true,
+        bulkDiscountPct: p.bulkDiscountPct ?? 20
+      };
+    });
     res.json(formatted);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to fetch products' });
   }
 });
 
-app.post('/api/products', async (req, res) => {
-  const { name, price, stock, categoryId, image } = req.body;
+app.get('/api/products/:id', async (req, res) => {
   try {
+    const p = await prisma.product.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: { category: true }
+    });
+    if (!p) return res.status(404).json({ error: 'Product not found' });
+    let gallery = [];
+    try {
+      gallery = p.images ? JSON.parse(p.images) : [];
+    } catch (e) {
+      gallery = [];
+    }
+    res.json({
+      id: p.id,
+      name: p.name,
+      description: p.description || '',
+      price: p.price,
+      stock: p.stock,
+      image: p.image || '/crochet_tote.jpg',
+      images: Array.isArray(gallery) && gallery.length > 0 ? gallery : [p.image || '/crochet_tote.jpg'],
+      category: p.category.name,
+      categoryId: p.categoryId,
+      rating: p.rating ?? 5.0,
+      allowCustomText: p.allowCustomText ?? true,
+      bulkDiscountPct: p.bulkDiscountPct ?? 20
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch product' });
+  }
+});
+
+app.post('/api/products', upload.array('imageFiles', 10), async (req, res) => {
+  try {
+    const {
+      name,
+      price,
+      stock,
+      categoryId,
+      description,
+      primaryIndex = 0
+    } = req.body;
+
+    let uploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      uploadedUrls = req.files.map((f) => `/uploads/${f.filename}`);
+    } else if (req.body.existingImages) {
+      try {
+        uploadedUrls = JSON.parse(req.body.existingImages);
+      } catch (e) {
+        uploadedUrls = [req.body.existingImages];
+      }
+    }
+
+    if (uploadedUrls.length === 0) {
+      uploadedUrls = ['/crochet_tote.jpg'];
+    }
+
+    const pIdx = Math.min(Math.max(0, parseInt(primaryIndex) || 0), uploadedUrls.length - 1);
+    const primaryImage = uploadedUrls[pIdx] || uploadedUrls[0];
+
     const product = await prisma.product.create({
-      data: { name, price: parseFloat(price), stock: parseInt(stock), categoryId: parseInt(categoryId), image }
+      data: {
+        name,
+        description: description || '',
+        price: parseFloat(price),
+        stock: parseInt(stock || 0),
+        categoryId: parseInt(categoryId),
+        image: primaryImage,
+        images: JSON.stringify(uploadedUrls),
+      },
+      include: { category: true }
     });
     res.status(201).json(product);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to create product' });
+  }
+});
+
+app.put('/api/products/:id', upload.array('imageFiles', 10), async (req, res) => {
+  try {
+    const {
+      name,
+      price,
+      stock,
+      categoryId,
+      description,
+      primaryIndex = 0
+    } = req.body;
+
+    // Existing images kept
+    let existingList = [];
+    if (req.body.existingImages) {
+      try {
+        existingList = JSON.parse(req.body.existingImages);
+      } catch (e) {
+        existingList = [req.body.existingImages];
+      }
+    }
+
+    let newlyUploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      newlyUploadedUrls = req.files.map((f) => `/uploads/${f.filename}`);
+    }
+
+    let allImages = [...existingList, ...newlyUploadedUrls];
+    if (allImages.length === 0) {
+      allImages = ['/crochet_tote.jpg'];
+    }
+
+    const pIdx = Math.min(Math.max(0, parseInt(primaryIndex) || 0), allImages.length - 1);
+    const primaryImage = allImages[pIdx] || allImages[0];
+
+    const updated = await prisma.product.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        name,
+        description: description || '',
+        price: parseFloat(price),
+        stock: parseInt(stock || 0),
+        categoryId: parseInt(categoryId),
+        image: primaryImage,
+        images: JSON.stringify(allImages),
+      },
+      include: { category: true }
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update product' });
   }
 });
 
@@ -281,6 +421,7 @@ app.delete('/api/products/:id', async (req, res) => {
     await prisma.product.delete({ where: { id: parseInt(req.params.id) } });
     res.status(204).send();
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to delete product' });
   }
 });
@@ -465,26 +606,51 @@ app.get('/api/tutorials/:id', async (req, res) => {
   }
 });
 
-app.post('/api/tutorials', async (req, res) => {
-  const {
-    title, description, price, isFree, categoryId, videoUrl,
-    image, level, type, duration, materials, steps,
-  } = req.body;
+app.post('/api/tutorials', upload.array('imageFiles', 10), async (req, res) => {
   try {
+    const {
+      title,
+      description,
+      price,
+      categoryId,
+      videoUrl,
+      level,
+      type,
+      duration,
+      primaryIndex = 0
+    } = req.body;
+
+    let uploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      uploadedUrls = req.files.map((f) => `/uploads/${f.filename}`);
+    } else if (req.body.existingImages) {
+      try {
+        uploadedUrls = JSON.parse(req.body.existingImages);
+      } catch (e) {
+        uploadedUrls = [req.body.existingImages];
+      }
+    }
+
+    if (uploadedUrls.length === 0) {
+      uploadedUrls = ['/crochet_tote.jpg'];
+    }
+
+    const pIdx = Math.min(Math.max(0, parseInt(primaryIndex) || 0), uploadedUrls.length - 1);
+    const primaryImage = uploadedUrls[pIdx] || uploadedUrls[0];
+
     const tutorial = await prisma.tutorial.create({
       data: {
         title,
-        description,
+        description: description || '',
         price: parseFloat(price) || 0,
-        isFree: Boolean(isFree) || Number(price) === 0,
+        isFree: Number(price) === 0,
         categoryId: parseInt(categoryId),
-        videoUrl,
-        image,
-        level,
-        type,
-        duration,
-        materials: materials ? JSON.stringify(materials) : null,
-        steps: steps ? JSON.stringify(steps) : null,
+        videoUrl: videoUrl || '',
+        image: primaryImage,
+        level: level || 'Beginner',
+        type: type || 'Video',
+        duration: duration || '',
+        materials: JSON.stringify(uploadedUrls), // keep all images list accessible
       },
       include: { category: true },
     });
@@ -492,6 +658,66 @@ app.post('/api/tutorials', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to create tutorial' });
+  }
+});
+
+app.put('/api/tutorials/:id', upload.array('imageFiles', 10), async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      price,
+      categoryId,
+      videoUrl,
+      level,
+      type,
+      duration,
+      primaryIndex = 0
+    } = req.body;
+
+    let existingList = [];
+    if (req.body.existingImages) {
+      try {
+        existingList = JSON.parse(req.body.existingImages);
+      } catch (e) {
+        existingList = [req.body.existingImages];
+      }
+    }
+
+    let newlyUploadedUrls = [];
+    if (req.files && req.files.length > 0) {
+      newlyUploadedUrls = req.files.map((f) => `/uploads/${f.filename}`);
+    }
+
+    let allImages = [...existingList, ...newlyUploadedUrls];
+    if (allImages.length === 0) {
+      allImages = ['/crochet_tote.jpg'];
+    }
+
+    const pIdx = Math.min(Math.max(0, parseInt(primaryIndex) || 0), allImages.length - 1);
+    const primaryImage = allImages[pIdx] || allImages[0];
+
+    const updated = await prisma.tutorial.update({
+      where: { id: parseInt(req.params.id) },
+      data: {
+        title,
+        description: description || '',
+        price: parseFloat(price) || 0,
+        isFree: Number(price) === 0,
+        categoryId: parseInt(categoryId),
+        videoUrl: videoUrl || '',
+        image: primaryImage,
+        level: level || 'Beginner',
+        type: type || 'Video',
+        duration: duration || '',
+        materials: JSON.stringify(allImages),
+      },
+      include: { category: true },
+    });
+    res.json(toTutorial(updated));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update tutorial' });
   }
 });
 
@@ -581,6 +807,14 @@ app.get('/api/orders', async (req, res) => {
         total: o.totalAmount,
         items: formatOrderItemsSummary(o.items),
         itemsCount: o.items.reduce((sum, item) => sum + item.quantity, 0),
+        itemsList: o.items.map((item) => ({
+          id: item.id,
+          name: item.product?.name || item.tutorial?.title || 'Item',
+          type: item.tutorialId ? 'Tutorial' : 'Product',
+          quantity: item.quantity,
+          price: item.price,
+          imageUrl: item.product?.imageUrl || item.tutorial?.thumbnailUrl || null,
+        })),
         hasTutorial,
         hasProduct,
         tutorialIds: o.items.map((item) => item.tutorialId).filter(Boolean),
@@ -730,6 +964,25 @@ app.post('/api/orders/:id/confirm', upload.single('screenshot'), async (req, res
       order.items.map((item) => item.tutorialId).filter(Boolean)
     )];
 
+    // Automatically send invoice email to customer for regular order
+    if (existing.customerEmail) {
+      prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: true,
+              tutorial: true,
+            }
+          }
+        }
+      }).then(fullOrder => {
+        if (fullOrder) {
+          sendRegularOrderInvoiceEmail(fullOrder);
+        }
+      }).catch(e => console.error('[Auto Invoice Send Error]:', e));
+    }
+
     res.json({
       id: order.id,
       displayId: displayOrderId(order.id),
@@ -806,8 +1059,22 @@ app.put('/api/orders/:id/status', async (req, res) => {
     const { status } = req.body;
     const order = await prisma.order.update({
       where: { id: parseInt(req.params.id) },
-      data: { status }
+      data: { status },
+      include: {
+        items: {
+          include: {
+            product: true,
+            tutorial: true
+          }
+        }
+      }
     });
+
+    // If order was confirmed (PAID or DELIVERED) and has customer email, auto-send invoice email
+    if ((status === 'PAID' || status === 'DELIVERED') && order.customerEmail) {
+      sendRegularOrderInvoiceEmail(order);
+    }
+
     res.json(order);
   } catch (error) {
     console.error(error);
@@ -877,6 +1144,401 @@ app.delete('/api/hero-images/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete hero image' });
   }
 });
+
+// ========================
+// HOME PAGE CONTENT API
+// ========================
+
+const DEFAULT_HOME_CONTENT = {
+  heroTitle: 'Something special is on the way.',
+  heroTitleSpan: 'on the way.',
+  heroDescription: 'We’re creating handmade magic to make your moments more special and your gifts more meaningful.',
+  heroPrimaryBtn: 'Explore shop',
+  heroPrimaryLink: '/shop',
+  heroSecondaryBtn: 'Chat on WhatsApp',
+  whatsappMessage: 'Hi! I am interested in Swarnaa Creations.',
+  customTitle: 'Made for your moment',
+  customDesc: 'Need a one-of-a-kind gift or a bulk set for an event? Tell us what you imagine — we’ll craft it with you.',
+  customBtnText: 'Request a custom order',
+  closingTitle: 'Find a piece that feels like you.',
+  closingDesc: 'Browse the shop, or start a custom conversation.',
+  featuredProductIds: null,
+  featuredTutorialIds: null,
+  featuredJournalIds: null
+};
+
+app.get('/api/home-content', async (req, res) => {
+  try {
+    let content = await prisma.homePageContent.findFirst();
+    if (!content) {
+      content = await prisma.homePageContent.create({
+        data: DEFAULT_HOME_CONTENT
+      });
+    }
+    res.json(content);
+  } catch (error) {
+    console.error(error);
+    res.json(DEFAULT_HOME_CONTENT);
+  }
+});
+
+app.put('/api/home-content', async (req, res) => {
+  try {
+    const data = {
+      heroTitle: req.body.heroTitle || DEFAULT_HOME_CONTENT.heroTitle,
+      heroTitleSpan: req.body.heroTitleSpan || DEFAULT_HOME_CONTENT.heroTitleSpan,
+      heroDescription: req.body.heroDescription || DEFAULT_HOME_CONTENT.heroDescription,
+      heroPrimaryBtn: req.body.heroPrimaryBtn || DEFAULT_HOME_CONTENT.heroPrimaryBtn,
+      heroPrimaryLink: req.body.heroPrimaryLink || DEFAULT_HOME_CONTENT.heroPrimaryLink,
+      heroSecondaryBtn: req.body.heroSecondaryBtn || DEFAULT_HOME_CONTENT.heroSecondaryBtn,
+      whatsappMessage: req.body.whatsappMessage || DEFAULT_HOME_CONTENT.whatsappMessage,
+      customTitle: req.body.customTitle || DEFAULT_HOME_CONTENT.customTitle,
+      customDesc: req.body.customDesc || DEFAULT_HOME_CONTENT.customDesc,
+      customBtnText: req.body.customBtnText || DEFAULT_HOME_CONTENT.customBtnText,
+      closingTitle: req.body.closingTitle || DEFAULT_HOME_CONTENT.closingTitle,
+      closingDesc: req.body.closingDesc || DEFAULT_HOME_CONTENT.closingDesc,
+      featuredProductIds: req.body.featuredProductIds !== undefined 
+        ? (Array.isArray(req.body.featuredProductIds) ? JSON.stringify(req.body.featuredProductIds) : req.body.featuredProductIds) 
+        : null,
+      featuredTutorialIds: req.body.featuredTutorialIds !== undefined 
+        ? (Array.isArray(req.body.featuredTutorialIds) ? JSON.stringify(req.body.featuredTutorialIds) : req.body.featuredTutorialIds) 
+        : null,
+      featuredJournalIds: req.body.featuredJournalIds !== undefined 
+        ? (Array.isArray(req.body.featuredJournalIds) ? JSON.stringify(req.body.featuredJournalIds) : req.body.featuredJournalIds) 
+        : null,
+    };
+
+    let existing = await prisma.homePageContent.findFirst();
+    let updated;
+    if (existing) {
+      updated = await prisma.homePageContent.update({
+        where: { id: existing.id },
+        data
+      });
+    } else {
+      updated = await prisma.homePageContent.create({
+        data
+      });
+    }
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update homepage content' });
+  }
+});
+
+// ========================
+// CUSTOM REQUESTS API
+// ========================
+
+// GET all custom requests (Admin)
+app.get('/api/custom-requests', async (req, res) => {
+  try {
+    const list = await prisma.customRequest.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(list);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch custom requests' });
+  }
+});
+
+// POST submit custom commission request (with optional image uploads)
+app.post('/api/custom-requests', upload.array('referenceImages', 5), async (req, res) => {
+  try {
+    const {
+      customerName,
+      customerEmail,
+      customerPhone,
+      orderVolume,
+      quantity,
+      description,
+      deadline,
+      budget
+    } = req.body;
+
+    if (!customerName || !customerEmail || !description) {
+      return res.status(400).json({ error: 'Name, email, and description are required' });
+    }
+
+    const count = await prisma.customRequest.count();
+    const requestId = `REQ-${1001 + count}`;
+
+    const uploadedUrls = (req.files || []).map(f => `/uploads/${f.filename}`);
+
+    const item = await prisma.customRequest.create({
+      data: {
+        requestId,
+        customerName: String(customerName).trim(),
+        customerEmail: String(customerEmail).trim().toLowerCase(),
+        customerPhone: customerPhone ? String(customerPhone).trim() : null,
+        orderVolume: orderVolume || 'single',
+        quantity: parseInt(quantity, 10) || 1,
+        description: String(description).trim(),
+        deadline: deadline || null,
+        budget: budget ? String(budget).trim() : null,
+        imageUrls: uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : null,
+        status: 'Pending'
+      }
+    });
+
+    res.status(201).json(item);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to submit custom commission request' });
+  }
+});
+
+// Email transporter for automated invoice dispatch
+const nodemailer = require('nodemailer');
+
+const createEmailTransporter = () => {
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+  // Fallback test/log account if credentials are not configured
+  return null;
+};
+
+const sendInvoiceEmail = async (customReq) => {
+  const invNumber = customReq.invoiceNumber || `SC-${String(customReq.id).padStart(4, '0')}`;
+  const amount = customReq.quotedAmount || customReq.budget || 'N/A';
+  const phone = process.env.VITE_WHATSAPP_NUMBER || process.env.WHATSAPP_NUMBER || '919445542398';
+  
+  const subject = `Order Confirmed & Invoice ${invNumber} - Swarnaa Creations`;
+  const htmlContent = `
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px; background: #ffffff;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="color: #E20171; margin: 0; font-size: 26px; letter-spacing: 1px;">SWARNAA CREATIONS</h1>
+        <p style="color: #6B7280; font-size: 13px; margin: 4px 0 0;">Handcrafted Elegance, Fine Crochet & Artisanal Keepsakes</p>
+        <p style="color: #9CA3AF; font-size: 12px; margin: 4px 0 0;">31, Thiruvalluvar Street, New Perungalathur, Chennai - 600063</p>
+      </div>
+
+      <div style="background: #FDF2F8; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 6px; color: #E20171; font-size: 16px;">Order Confirmed & Payment Verified ✓</h3>
+        <p style="margin: 0; color: #4B5563; font-size: 14px;">
+          Dear <strong>${customReq.customerName}</strong>, thank you! Your payment has been verified and our artisans have commenced handcrafting your order.
+        </p>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Invoice Number:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${invNumber}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Request ID:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${customReq.requestId}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Order Details:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${customReq.quantity}x (${customReq.orderVolume === 'bulk' ? 'Bulk Order' : 'Single Piece'})</td>
+        </tr>
+        ${customReq.deadline ? `
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Target Deadline:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${customReq.deadline}</td>
+        </tr>` : ''}
+        <tr style="border-bottom: 2px solid #E20171;">
+          <td style="padding: 12px 0; font-size: 16px; font-weight: bold; color: #111827;">Total Paid:</td>
+          <td style="padding: 12px 0; font-size: 18px; font-weight: bold; text-align: right; color: #E20171;">Rs ${amount}</td>
+        </tr>
+      </table>
+
+      <div style="background: #F9FAFB; padding: 14px; border-radius: 8px; font-size: 13px; color: #4B5563; margin-bottom: 20px;">
+        <strong>Custom Specification:</strong>
+        <p style="margin: 6px 0 0; font-style: italic;">"${customReq.description}"</p>
+      </div>
+
+      <div style="text-align: center; color: #9CA3AF; font-size: 12px; border-top: 1px solid #E5E7EB; padding-top: 16px;">
+        Swarnaa Creations • WhatsApp: +${phone} • support@swarnaacreations.com • www.swarnaacreations.com
+      </div>
+    </div>
+  `;
+
+  try {
+    const transporter = createEmailTransporter();
+    if (transporter) {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || '"Swarnaa Creations" <orders@swarnaa.com>',
+        to: customReq.customerEmail,
+        subject,
+        html: htmlContent,
+      });
+      console.log(`[Invoice Email] Successfully dispatched to ${customReq.customerEmail} for ${invNumber}`);
+    } else {
+      console.log(`[Invoice Email Simulation] To: ${customReq.customerEmail} | Subject: ${subject}`);
+    }
+  } catch (mailErr) {
+    console.error('[Invoice Email Error]:', mailErr);
+  }
+};
+
+const sendRegularOrderInvoiceEmail = async (order) => {
+  const invNumber = `SC-${String(order.id).padStart(4, '0')}`;
+  const phone = process.env.VITE_WHATSAPP_NUMBER || process.env.WHATSAPP_NUMBER || '919445542398';
+  const subject = `Order Confirmed & Invoice ${invNumber} - Swarnaa Creations`;
+  const itemsHtml = (order.items || []).map(item => `
+    <tr style="border-bottom: 1px solid #E5E7EB;">
+      <td style="padding: 10px 0; color: #111827;">${item.product ? item.product.name : (item.tutorial ? item.tutorial.title : 'Art Piece / Tutorial')}</td>
+      <td style="padding: 10px 0; text-align: center; color: #6B7280;">${item.quantity}</td>
+      <td style="padding: 10px 0; text-align: right; font-weight: 600; color: #111827;">Rs ${item.price * item.quantity}</td>
+    </tr>
+  `).join('');
+
+  const htmlContent = `
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #E5E7EB; border-radius: 12px; background: #ffffff;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="color: #E20171; margin: 0; font-size: 26px; letter-spacing: 1px;">SWARNAA CREATIONS</h1>
+        <p style="color: #6B7280; font-size: 13px; margin: 4px 0 0;">Handcrafted Elegance, Fine Crochet & Artisanal Keepsakes</p>
+        <p style="color: #9CA3AF; font-size: 12px; margin: 4px 0 0;">31, Thiruvalluvar Street, New Perungalathur, Chennai - 600063</p>
+      </div>
+
+      <div style="background: #FDF2F8; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+        <h3 style="margin: 0 0 6px; color: #E20171; font-size: 16px;">Order Confirmed & Payment Verified ✓</h3>
+        <p style="margin: 0; color: #4B5563; font-size: 14px;">
+          Dear <strong>${order.customerName || 'Customer'}</strong>, your order has been confirmed! Your invoice is below.
+        </p>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Invoice Number:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${invNumber}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #E5E7EB;">
+          <td style="padding: 8px 0; color: #6B7280;">Order Ref:</td>
+          <td style="padding: 8px 0; font-weight: bold; text-align: right; color: #111827;">${invNumber}</td>
+        </tr>
+      </table>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px;">
+        <thead>
+          <tr style="background: #F9FAFB; border-bottom: 2px solid #E5E7EB;">
+            <th style="padding: 8px 0; text-align: left; color: #6B7280;">Item</th>
+            <th style="padding: 8px 0; text-align: center; color: #6B7280;">Qty</th>
+            <th style="padding: 8px 0; text-align: right; color: #6B7280;">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+        <tfoot>
+          <tr style="border-top: 2px solid #E20171;">
+            <td colspan="2" style="padding: 12px 0; font-size: 16px; font-weight: bold; color: #111827;">Total Paid:</td>
+            <td style="padding: 12px 0; font-size: 18px; font-weight: bold; text-align: right; color: #E20171;">Rs ${order.totalAmount}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      ${order.shippingAddress ? `
+      <div style="background: #F9FAFB; padding: 14px; border-radius: 8px; font-size: 13px; color: #4B5563; margin-bottom: 20px;">
+        <strong>Shipping Destination:</strong>
+        <p style="margin: 4px 0 0;">${order.shippingAddress}, ${[order.shippingCity, order.shippingState, order.shippingPincode].filter(Boolean).join(', ')}</p>
+      </div>` : ''}
+
+      <div style="text-align: center; color: #9CA3AF; font-size: 12px; border-top: 1px solid #E5E7EB; padding-top: 16px;">
+        Swarnaa Creations • WhatsApp: +${phone} • support@swarnaacreations.com • www.swarnaacreations.com
+      </div>
+    </div>
+  `;
+
+  try {
+    const transporter = createEmailTransporter();
+    if (transporter) {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || '"Swarnaa Creations" <orders@swarnaa.com>',
+        to: order.customerEmail,
+        subject,
+        html: htmlContent,
+      });
+      console.log(`[Regular Order Invoice Email] Dispatched to ${order.customerEmail} for ${invNumber}`);
+    } else {
+      console.log(`[Regular Order Invoice Email Simulation] To: ${order.customerEmail} | Subject: ${subject}`);
+    }
+  } catch (mailErr) {
+    console.error('[Regular Order Invoice Email Error]:', mailErr);
+  }
+};
+
+// PATCH quote price on custom request (Admin)
+app.patch('/api/custom-requests/:id/quote', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { quotedAmount, adminNotes } = req.body;
+
+    const updated = await prisma.customRequest.update({
+      where: { id: parseInt(id, 10) },
+      data: {
+        quotedAmount: quotedAmount ? parseFloat(quotedAmount) : null,
+        adminNotes: adminNotes || null,
+        status: 'Quoted',
+      }
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to record quote' });
+  }
+});
+
+// POST upload payment proof screenshot (Admin) -> Generates invoice & sends confirmation email
+app.post('/api/custom-requests/:id/payment-proof', upload.single('paymentProof'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ error: 'Payment proof screenshot file is required' });
+    }
+
+    const proofUrl = `/uploads/${req.file.filename}`;
+    const invNumber = `SC-${String(id).padStart(4, '0')}`;
+
+    const updated = await prisma.customRequest.update({
+      where: { id: parseInt(id, 10) },
+      data: {
+        paymentProofUrl: proofUrl,
+        invoiceNumber: invNumber,
+        invoiceSentAt: new Date(),
+        status: 'Paid',
+      }
+    });
+
+    // Automatically send confirmation & invoice email to customer
+    sendInvoiceEmail(updated);
+
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to upload payment proof' });
+  }
+});
+
+// PATCH update custom request status (Admin - Quoted, Declined, Pending, Paid)
+app.patch('/api/custom-requests/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const updated = await prisma.customRequest.update({
+      where: { id: parseInt(id, 10) },
+      data: { status }
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update custom request status' });
+  }
+});
+
+
 
 const PORT = process.env.PORT || 3001;
 

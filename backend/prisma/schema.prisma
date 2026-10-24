@@ -34,16 +34,21 @@ model Category {
 }
 
 model Product {
-  id         Int         @id @default(autoincrement())
-  name       String
-  price      Float
-  stock      Int         @default(0)
-  image      String?
-  category   Category    @relation(fields: [categoryId], references: [id])
-  categoryId Int
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  OrderItem  OrderItem[]
+  id               Int         @id @default(autoincrement())
+  name             String
+  description      String?     @db.Text
+  price            Float
+  stock            Int         @default(0)
+  image            String?     @db.Text // Primary image
+  images           String?     @db.Text // JSON array of additional gallery image URLs
+  category         Category    @relation(fields: [categoryId], references: [id])
+  categoryId       Int
+  rating           Float       @default(5.0)
+  allowCustomText  Boolean     @default(true)
+  bulkDiscountPct  Int         @default(20)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  OrderItem        OrderItem[]
 }
 
 model Tutorial {
@@ -114,3 +119,45 @@ model HeroImage {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 }
+
+model HomePageContent {
+  id               Int      @id @default(autoincrement())
+  heroTitle        String   @default("Something special is on the way.")
+  heroTitleSpan    String   @default("on the way.")
+  heroDescription  String   @db.Text
+  heroPrimaryBtn   String   @default("Explore shop")
+  heroPrimaryLink  String   @default("/shop")
+  heroSecondaryBtn String   @default("Chat on WhatsApp")
+  whatsappMessage  String?  @db.Text
+  customTitle      String   @default("Made for your moment")
+  customDesc       String   @db.Text
+  customBtnText    String   @default("Request a custom order")
+  closingTitle     String   @default("Find a piece that feels like you.")
+  closingDesc      String   @default("Browse the shop, or start a custom conversation.")
+  featuredProductIds  String?  @db.Text // JSON array of selected product IDs
+  featuredTutorialIds String?  @db.Text // JSON array of selected tutorial IDs
+  featuredJournalIds  String?  @db.Text // JSON array of selected journal IDs
+  updatedAt        DateTime @updatedAt
+}
+
+model CustomRequest {
+  id               Int      @id @default(autoincrement())
+  requestId        String   @unique // e.g. REQ-1001
+  customerName     String
+  customerEmail    String
+  customerPhone    String?
+  orderVolume      String   @default("single") // "single" | "bulk"
+  quantity         Int      @default(1)
+  description      String   @db.Text
+  deadline         String?
+  budget           String?  // null initially unless admin quotes or customer specified
+  quotedAmount     Float?   // Admin confirmed final quote in Rs
+  adminNotes       String?  @db.Text
+  paymentProofUrl  String?  // Admin uploaded screenshot of customer payment
+  invoiceNumber    String?  // e.g. INV-REQ1001
+  invoiceSentAt    DateTime?
+  status           String   @default("Pending") // "Pending" | "Quoted" | "Paid" | "Declined"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+

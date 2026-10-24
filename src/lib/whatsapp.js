@@ -1,6 +1,6 @@
 /** Business WhatsApp number in international format, digits only */
 export const WHATSAPP_NUMBER =
-  (import.meta.env.VITE_WHATSAPP_NUMBER || '919876543210').replace(/\D/g, '')
+  (import.meta.env.VITE_WHATSAPP_NUMBER || '919445542398').replace(/\D/g, '')
 
 export function whatsappUrl(message = '') {
   const base = `https://wa.me/${WHATSAPP_NUMBER}`

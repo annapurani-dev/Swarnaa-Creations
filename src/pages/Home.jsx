@@ -4,12 +4,27 @@ import { ArrowRight, Play, FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ScrollReveal from '../components/ScrollReveal'
 import HeroOrbit from '../components/HeroOrbit'
-import { fetchHeroImages, fetchProducts, fetchTutorials, fetchJournals } from '../api'
+import { fetchHeroImages, fetchProducts, fetchTutorials, fetchJournals, fetchHomeContent } from '../api'
 import { mockProducts } from '../data/mockProducts'
 import { mockTutorials } from '../data/mockTutorials'
 import { whatsappUrl, WHATSAPP_DEFAULT_MESSAGE } from '../lib/whatsapp'
 
 const FALLBACK_IMAGES = ['/crochet_tote.jpg', '/amigurumi_bear.jpg', '/hero-image.jpg']
+
+const DEFAULT_HOME = {
+  heroTitle: 'Something special is on the way.',
+  heroTitleSpan: 'on the way.',
+  heroDescription: 'We’re creating handmade magic to make your moments more special and your gifts more meaningful.',
+  heroPrimaryBtn: 'Explore shop',
+  heroPrimaryLink: '/shop',
+  heroSecondaryBtn: 'Chat on WhatsApp',
+  whatsappMessage: WHATSAPP_DEFAULT_MESSAGE,
+  customTitle: 'Made for your moment',
+  customDesc: 'Need a one-of-a-kind gift or a bulk set for an event? Tell us what you imagine — we’ll craft it with you.',
+  customBtnText: 'Request a custom order',
+  closingTitle: 'Find a piece that feels like you.',
+  closingDesc: 'Browse the shop, or start a custom conversation.'
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -22,6 +37,7 @@ const fadeUp = {
 
 export default function Home() {
   const [heroImages, setHeroImages] = useState(FALLBACK_IMAGES)
+  const [homeContent, setHomeContent] = useState(DEFAULT_HOME)
   const [products, setProducts] = useState([])
   const [tutorials, setTutorials] = useState([])
   const [journals, setJournals] = useState([])
@@ -37,8 +53,9 @@ export default function Home() {
 
   useEffect(() => {
     const load = async () => {
-      const [heroRows, productRows, tutorialRows, journalRows] = await Promise.all([
+      const [heroRows, content, productRows, tutorialRows, journalRows] = await Promise.all([
         fetchHeroImages(),
+        fetchHomeContent(),
         fetchProducts(),
         fetchTutorials(),
         fetchJournals(),
@@ -49,9 +66,60 @@ export default function Home() {
         .map((r) => r.imageUrl)
       if (urls.length) setHeroImages(urls)
 
-      setProducts((productRows.length ? productRows : mockProducts).slice(0, 4))
-      setTutorials((tutorialRows.length ? tutorialRows : mockTutorials).slice(0, 3))
-      setJournals(journalRows.slice(0, 3))
+      if (content) {
+        setHomeContent((prev) => ({ ...prev, ...content }))
+      }
+
+      // Products from database (fall back to mockProducts ONLY if database has 0 products yet)
+      const allProds = productRows && productRows.length > 0 ? productRows : (mockProducts || [])
+      let selectedProds = []
+      if (content?.featuredProductIds) {
+        try {
+          const ids = typeof content.featuredProductIds === 'string' 
+            ? JSON.parse(content.featuredProductIds) 
+            : content.featuredProductIds
+          if (Array.isArray(ids) && ids.length > 0) {
+            selectedProds = ids.map(id => allProds.find(p => String(p.id) === String(id))).filter(Boolean)
+          }
+        } catch {
+          // ignore json parse error
+        }
+      }
+      setProducts(selectedProds.length > 0 ? selectedProds : allProds.slice(0, 4))
+
+      // Tutorials from database (fall back to mockTutorials ONLY if database has 0 tutorials yet)
+      const allTuts = tutorialRows && tutorialRows.length > 0 ? tutorialRows : (mockTutorials || [])
+      let selectedTuts = []
+      if (content?.featuredTutorialIds) {
+        try {
+          const ids = typeof content.featuredTutorialIds === 'string' 
+            ? JSON.parse(content.featuredTutorialIds) 
+            : content.featuredTutorialIds
+          if (Array.isArray(ids) && ids.length > 0) {
+            selectedTuts = ids.map(id => allTuts.find(t => String(t.id) === String(id))).filter(Boolean)
+          }
+        } catch {
+          // ignore json parse error
+        }
+      }
+      setTutorials(selectedTuts.length > 0 ? selectedTuts : allTuts.slice(0, 3))
+
+      // Journal posts from database
+      const allJournals = journalRows || []
+      let selectedJournals = []
+      if (content?.featuredJournalIds) {
+        try {
+          const ids = typeof content.featuredJournalIds === 'string' 
+            ? JSON.parse(content.featuredJournalIds) 
+            : content.featuredJournalIds
+          if (Array.isArray(ids) && ids.length > 0) {
+            selectedJournals = ids.map(id => allJournals.find(j => String(j.id) === String(id))).filter(Boolean)
+          }
+        } catch {
+          // ignore json parse error
+        }
+      }
+      setJournals(selectedJournals.length > 0 ? selectedJournals : allJournals.slice(0, 3))
     }
     load()
   }, [])
@@ -73,9 +141,15 @@ export default function Home() {
               initial="hidden"
               animate="show"
             >
-              Something special
-              <br />
-              is <span>on the way.</span>
+              {homeContent.heroTitleSpan && homeContent.heroTitle.includes(homeContent.heroTitleSpan) ? (
+                <>
+                  {homeContent.heroTitle.replace(homeContent.heroTitleSpan, '')}
+                  <br />
+                  <span>{homeContent.heroTitleSpan}</span>
+                </>
+              ) : (
+                homeContent.heroTitle
+              )}
             </motion.h1>
 
             <motion.p
@@ -85,29 +159,8 @@ export default function Home() {
               initial="hidden"
               animate="show"
             >
-              We’re creating handmade magic to make your moments more special
-              and your gifts more meaningful.
+              {homeContent.heroDescription}
             </motion.p>
-
-            <motion.div
-              className="hero-soon__actions"
-              custom={2}
-              variants={fadeUp}
-              initial="hidden"
-              animate="show"
-            >
-              <Link to="/shop" className="btn-primary">
-                Explore shop
-              </Link>
-              <a
-                href={whatsappUrl(WHATSAPP_DEFAULT_MESSAGE)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-ghost"
-              >
-                Chat on WhatsApp
-              </a>
-            </motion.div>
           </div>
         </motion.div>
       </section>
@@ -135,7 +188,7 @@ export default function Home() {
                       {(product.category || '').replace('-', ' ')}
                     </p>
                     <h3>{product.name}</h3>
-                    <p className="home-product__price">₹{product.price}</p>
+                    <p className="home-product__price">Rs {product.price}</p>
                   </motion.div>
                 </Link>
               </ScrollReveal>
@@ -168,7 +221,7 @@ export default function Home() {
                     </div>
                     <p className="home-tutorial__meta">
                       {tut.category}
-                      {tut.price === 0 ? ' · Free' : ` · ₹${tut.price}`}
+                      {tut.price === 0 ? ' · Free' : ` · Rs ${tut.price}`}
                     </p>
                     <h3>{tut.title}</h3>
                   </motion.div>
@@ -184,19 +237,19 @@ export default function Home() {
         <div className="container">
           <ScrollReveal className="home-band" y={20}>
             <div className="home-band__copy">
-              <h2>Made for your moment</h2>
+              <h2>{homeContent.customTitle || 'Made for your moment'}</h2>
               <p>
-                Need a one-of-a-kind gift or a bulk set for an event?
-                Tell us what you imagine — we’ll craft it with you.
+                {homeContent.customDesc ||
+                  'Need a one-of-a-kind gift or a bulk set for an event? Tell us what you imagine — we’ll craft it with you.'}
               </p>
             </div>
             <div className="home-band__actions">
               <Link to="/custom-orders" className="btn-primary">
-                Request a custom order
+                {homeContent.customBtnText || 'Request a custom order'}
                 <ArrowRight size={16} />
               </Link>
               <a
-                href={whatsappUrl('Hi! I’d like to discuss a custom order with Swarnaa Creations.')}
+                href={whatsappUrl(homeContent.whatsappMessage || 'Hi! I’d like to discuss a custom order with Swarnaa Creations.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-ghost"
@@ -241,12 +294,12 @@ export default function Home() {
       <section className="home-section home-section--close">
         <div className="container">
           <ScrollReveal className="home-close" y={20}>
-            <h2>Find a piece that feels like you.</h2>
-            <p>Browse the shop, or start a custom conversation.</p>
+            <h2>{homeContent.closingTitle || 'Find a piece that feels like you.'}</h2>
+            <p>{homeContent.closingDesc || 'Browse the shop, or start a custom conversation.'}</p>
             <div className="home-close__actions">
               <Link to="/shop" className="btn-primary">Shop crafts</Link>
               <a
-                href={whatsappUrl(WHATSAPP_DEFAULT_MESSAGE)}
+                href={whatsappUrl(homeContent.whatsappMessage || WHATSAPP_DEFAULT_MESSAGE)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-ghost"

@@ -11,15 +11,19 @@ import { useWishlist } from '../context/WishlistContext'
 import { formatCategoryLabel } from '../lib/categories'
 import Atmosphere from './Atmosphere'
 import BrandMark from './BrandMark'
+import PageBack from './PageBack'
 import ScrollReveal from './ScrollReveal'
 import WhatsAppFab from './WhatsAppFab'
 
 export default function Layout() {
   const [isShopHovered, setIsShopHovered] = useState(false)
+  const [isTutorialsHovered, setIsTutorialsHovered] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobileShopOpen, setIsMobileShopOpen] = useState(false)
+  const [isMobileTutorialsOpen, setIsMobileTutorialsOpen] = useState(false)
   const [shopCategories, setShopCategories] = useState([])
+  const [tutorialCategories, setTutorialCategories] = useState([])
   const {
     isLoggedIn,
     user,
@@ -61,6 +65,7 @@ export default function Layout() {
   useEffect(() => {
     setIsMobileMenuOpen(false)
     setIsMobileShopOpen(false)
+    setIsMobileTutorialsOpen(false)
     setIsUserMenuOpen(false)
   }, [location.pathname, location.search])
 
@@ -69,6 +74,11 @@ export default function Layout() {
     fetchCategories('PRODUCT')
       .then((cats) => { if (alive) setShopCategories(Array.isArray(cats) ? cats : []) })
       .catch(() => { if (alive) setShopCategories([]) })
+
+    fetchCategories('TUTORIAL')
+      .then((cats) => { if (alive) setTutorialCategories(Array.isArray(cats) ? cats : []) })
+      .catch(() => { if (alive) setTutorialCategories([]) })
+
     return () => { alive = false }
   }, [])
 
@@ -228,7 +238,6 @@ export default function Layout() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                   >
-                    <Link to="/shop">All crafts</Link>
                     {shopCategories.map((cat) => (
                       <Link key={cat.id} to={`/shop?category=${encodeURIComponent(cat.name)}`}>
                         {formatCategoryLabel(cat.name)}
@@ -238,7 +247,28 @@ export default function Layout() {
                 )}
               </AnimatePresence>
             </div>
-            <Link to="/tutorials" className="site-nav__link">Tutorials</Link>
+            <div
+              className="site-nav__dropdown"
+              onMouseEnter={() => setIsTutorialsHovered(true)}
+              onMouseLeave={() => setIsTutorialsHovered(false)}
+            >
+              <Link to="/tutorials" className="site-nav__link">
+                Tutorials <ChevronDown size={14} />
+              </Link>
+              <AnimatePresence>
+                {isTutorialsHovered && (
+                  <motion.div
+                    className="site-nav__menu"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                  >
+                    <Link to="/tutorials?filter=free">Free Tutorials</Link>
+                    <Link to="/tutorials?filter=paid">Paid Tutorials</Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <Link to="/journal" className="site-nav__link">Journal</Link>
           </nav>
 
@@ -281,20 +311,6 @@ export default function Layout() {
                           <Link to="/profile" onClick={() => setIsUserMenuOpen(false)}>
                             My Profile
                           </Link>
-                          <Link to="/learning" onClick={() => setIsUserMenuOpen(false)}>
-                            My Learning
-                          </Link>
-                          {user?.role === 'ADMIN' && (
-                            <Link
-                              to="/admin"
-                              onClick={() => {
-                                setIsUserMenuOpen(false)
-                                exitStorePreview()
-                              }}
-                            >
-                              Admin portal
-                            </Link>
-                          )}
                           <button
                             type="button"
                             className="is-danger"
@@ -305,7 +321,7 @@ export default function Layout() {
                               navigate('/')
                             }}
                           >
-                            Sign Out
+                            Logout
                           </button>
                         </motion.div>
                       )}
@@ -328,7 +344,11 @@ export default function Layout() {
                       <BookOpen size={20} strokeWidth={2} />
                     </Link>
                     <Link to="/wishlist" className="site-actions__btn" aria-label="Wishlist" style={{ display: 'grid' }}>
-                      <Heart size={20} strokeWidth={2} />
+                      <Heart
+                        size={20}
+                        strokeWidth={2}
+                        fill={getWishlistCount() > 0 ? 'currentColor' : 'none'}
+                      />
                       {getWishlistCount() > 0 && (
                         <span className="site-actions__badge">{getWishlistCount()}</span>
                       )}
@@ -389,7 +409,6 @@ export default function Layout() {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
-                      <Link to="/shop" onClick={closeMobileMenu} className="mobile-nav__sub">All crafts</Link>
                       {shopCategories.map((cat) => (
                         <Link
                           key={cat.id}
@@ -404,7 +423,46 @@ export default function Layout() {
                   )}
                 </AnimatePresence>
               </div>
-              <Link to="/tutorials" onClick={closeMobileMenu}>Tutorials</Link>
+              <div className="mobile-nav__group">
+                <button
+                  type="button"
+                  className="mobile-nav__btn mobile-nav__toggle"
+                  aria-expanded={isMobileTutorialsOpen}
+                  onClick={() => setIsMobileTutorialsOpen((open) => !open)}
+                >
+                  Tutorials
+                  <ChevronDown
+                    size={16}
+                    className={isMobileTutorialsOpen ? 'mobile-nav__chevron is-open' : 'mobile-nav__chevron'}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {isMobileTutorialsOpen && (
+                    <motion.div
+                      className="mobile-nav__dropdown"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Link
+                        to="/tutorials?filter=free"
+                        onClick={closeMobileMenu}
+                        className="mobile-nav__sub"
+                      >
+                        Free Tutorials
+                      </Link>
+                      <Link
+                        to="/tutorials?filter=paid"
+                        onClick={closeMobileMenu}
+                        className="mobile-nav__sub"
+                      >
+                        Paid Tutorials
+                      </Link>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               <Link to="/journal" onClick={closeMobileMenu}>Journal</Link>
               <Link to="/custom-orders" onClick={closeMobileMenu}>Custom Orders</Link>
               {isStorePreview ? (
@@ -434,6 +492,11 @@ export default function Layout() {
       </AnimatePresence>
 
       <main className="site-main">
+        {location.pathname !== '/' && (
+          <div className="page-back-bar">
+            <PageBack />
+          </div>
+        )}
         <Outlet />
       </main>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Play, FileText, Lock, Unlock, ArrowLeft, Heart } from 'lucide-react'
+import { Play, FileText, Lock, Unlock, Heart } from 'lucide-react'
 import { mockTutorials } from '../data/mockTutorials'
 import { fetchTutorial } from '../api'
 import { useAdminPreview } from '../context/AdminPreviewContext'
@@ -71,13 +71,10 @@ export default function TutorialDetail() {
   return (
     <div style={{ backgroundColor: 'transparent', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Header bar to go back and wishlist */}
       <ScrollReveal y={12}>
-        <div style={{ padding: '24px 40px', backgroundColor: 'white', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={() => navigate('/tutorials')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-            <ArrowLeft size={20} /> Back to Learning Hub
-          </button>
-          <button 
+        <div style={{ padding: '16px 40px', backgroundColor: 'white', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
             onClick={() => {
               if (isStorePreview) {
                 toast.info('Preview only — return to admin to manage the store.')
@@ -87,7 +84,7 @@ export default function TutorialDetail() {
             }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: isInWishlist(activeTutorial.id) ? 'var(--color-brand)' : 'var(--color-text-secondary)', fontWeight: 600 }}
           >
-            <Heart size={20} fill={isInWishlist(activeTutorial.id) ? "currentColor" : "none"} /> 
+            <Heart size={20} fill={isInWishlist(activeTutorial.id) ? "currentColor" : "none"} />
             {isInWishlist(activeTutorial.id) ? 'Saved to Wishlist' : 'Save to Wishlist'}
           </button>
         </div>

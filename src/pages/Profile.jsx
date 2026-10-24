@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Package, MapPin, LogOut, ChevronRight, X, CheckCircle } from 'lucide-react'
+import { Package, MapPin, LogOut, ChevronRight, X, CheckCircle, FileText, Printer, Download } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useAddresses } from '../context/AddressContext'
 import { fetchOrders } from '../api'
 import ScrollReveal from '../components/ScrollReveal'
+import FullPageInvoiceModal from '../components/FullPageInvoiceModal'
 
 const statusLabel = (status) => {
   const map = {
@@ -49,6 +50,7 @@ export default function Profile() {
 
   // Modals State
   const [trackingOrder, setTrackingOrder] = useState(null)
+  const [invoiceModalOrder, setInvoiceModalOrder] = useState(null)
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
   const [addressForm, setAddressForm] = useState({
     label: 'Home',
@@ -249,27 +251,37 @@ export default function Profile() {
                           <div style={{ fontSize: '15px', color: 'var(--color-text)', lineHeight: 1.5 }}>{order.items}</div>
                         </div>
                         
-                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '16px' }}>
+                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
                           <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-brand)' }}>₹{order.total}</div>
-                          {tutorialOnly ? (
-                            <motion.button 
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <motion.button
                               type="button"
-                              onClick={() => navigate(order.tutorialIds?.[0] ? `/tutorial/${order.tutorialIds[0]}` : '/learning')}
+                              onClick={() => setInvoiceModalOrder(order)}
                               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                              style={{ background: 'var(--color-lavender-light)', border: 'none', color: 'var(--color-brand)', padding: '10px 20px', borderRadius: '50px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', color: 'var(--color-brand)', padding: '9px 16px', borderRadius: '50px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                             >
-                              Open tutorial <ChevronRight size={16} />
+                              <FileText size={15} /> Invoice
                             </motion.button>
-                          ) : (
-                            <motion.button 
-                              type="button"
-                              onClick={() => setTrackingOrder(order)}
-                              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                              style={{ background: 'var(--color-lavender-light)', border: 'none', color: 'var(--color-brand)', padding: '10px 20px', borderRadius: '50px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              Track Order <ChevronRight size={16} />
-                            </motion.button>
-                          )}
+                            {tutorialOnly ? (
+                              <motion.button 
+                                type="button"
+                                onClick={() => navigate(order.tutorialIds?.[0] ? `/tutorial/${order.tutorialIds[0]}` : '/learning')}
+                                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                style={{ background: 'var(--color-lavender-light)', border: 'none', color: 'var(--color-brand)', padding: '9px 18px', borderRadius: '50px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                Tutorial <ChevronRight size={15} />
+                              </motion.button>
+                            ) : (
+                              <motion.button 
+                                type="button"
+                                onClick={() => setTrackingOrder(order)}
+                                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                style={{ background: 'var(--color-lavender-light)', border: 'none', color: 'var(--color-brand)', padding: '9px 18px', borderRadius: '50px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                Track <ChevronRight size={15} />
+                              </motion.button>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     )
@@ -363,57 +375,119 @@ export default function Profile() {
                 <button onClick={() => setTrackingOrder(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}><X size={20} /></button>
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
                 <div>
                   <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Order ID</div>
-                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-brand)' }}>{trackingOrder.id}</div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-brand)' }}>{trackingOrder.id}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Estimated Delivery</div>
-                  <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>16 Oct 2026</div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Current Status</div>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      padding: '4px 12px',
+                      borderRadius: '50px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      ...statusStyles(trackingOrder.status)
+                    }}
+                  >
+                    {statusLabel(trackingOrder.status)}
+                  </span>
                 </div>
               </div>
 
-              {/* Mock Timeline */}
-              <div style={{ position: 'relative', paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                {/* Vertical Line */}
-                <div style={{ position: 'absolute', left: '7px', top: '8px', bottom: '8px', width: '2px', backgroundColor: '#F0F0F0', zIndex: 0 }}></div>
-                
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-brand)', marginTop: '4px', border: '3px solid white', boxShadow: '0 0 0 1px var(--color-brand)' }}></div>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>Order Placed</div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>12 Oct, 10:30 AM</div>
-                  </div>
-                </div>
+              {/* Dynamic Tracking Timeline */}
+              {(() => {
+                // Steps mapping directly to backend status progression
+                const steps = [
+                  {
+                    key: 'ORDER_PLACED',
+                    title: 'Order Placed & Payment Uploaded',
+                    completed: true,
+                    current: trackingOrder.status === 'PENDING_VERIFICATION',
+                    time: trackingOrder.date || 'Recent'
+                  },
+                  {
+                    key: 'PAID',
+                    title: 'Payment Verified & In Crafting',
+                    completed: ['PAID', 'SHIPPED', 'DELIVERED'].includes(trackingOrder.status),
+                    current: trackingOrder.status === 'PAID',
+                    time: ['PAID', 'SHIPPED', 'DELIVERED'].includes(trackingOrder.status) ? 'Confirmed' : 'Pending'
+                  },
+                  {
+                    key: 'SHIPPED',
+                    title: 'Dispatched & Handed to Courier',
+                    completed: ['SHIPPED', 'DELIVERED'].includes(trackingOrder.status),
+                    current: trackingOrder.status === 'SHIPPED',
+                    time: ['SHIPPED', 'DELIVERED'].includes(trackingOrder.status) ? 'On the way' : 'Pending'
+                  },
+                  {
+                    key: 'DELIVERED',
+                    title: 'Delivered',
+                    completed: trackingOrder.status === 'DELIVERED',
+                    current: trackingOrder.status === 'DELIVERED',
+                    time: trackingOrder.status === 'DELIVERED' ? 'Delivered' : 'Pending'
+                  }
+                ]
 
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: trackingOrder.status === 'Delivered' ? 'var(--color-brand)' : 'white', marginTop: '4px', border: '3px solid white', boxShadow: trackingOrder.status === 'Delivered' ? '0 0 0 1px var(--color-brand)' : '0 0 0 2px #E0E0E0' }}></div>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>Processing</div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>13 Oct, 02:15 PM</div>
-                  </div>
-                </div>
+                return (
+                  <div style={{ position: 'relative', paddingLeft: '28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                    {/* Vertical connecting line */}
+                    <div style={{ position: 'absolute', left: '9px', top: '10px', bottom: '16px', width: '2px', backgroundColor: '#E5E7EB', zIndex: 0 }} />
 
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: trackingOrder.status === 'Delivered' ? 'var(--color-brand)' : 'white', marginTop: '4px', border: '3px solid white', boxShadow: trackingOrder.status === 'Delivered' ? '0 0 0 1px var(--color-brand)' : '0 0 0 2px #E0E0E0' }}></div>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 600, color: trackingOrder.status === 'Delivered' ? 'var(--color-text)' : 'var(--color-text-secondary)', marginBottom: '4px' }}>Out for Delivery</div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{trackingOrder.status === 'Delivered' ? '14 Oct, 09:00 AM' : 'Pending'}</div>
-                  </div>
-                </div>
+                    {steps.map((step, idx) => {
+                      const isDone = step.completed
+                      const isCurrent = step.current
+                      const titleColor = isDone ? 'var(--color-text)' : '#9CA3AF'
 
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                  <div style={{ width: '16px', height: '16px', borderRadius: '50%', backgroundColor: trackingOrder.status === 'Delivered' ? '#2E7D32' : 'white', marginTop: '4px', border: '3px solid white', boxShadow: trackingOrder.status === 'Delivered' ? '0 0 0 1px #2E7D32' : '0 0 0 2px #E0E0E0' }}></div>
-                  <div>
-                    <div style={{ fontSize: '15px', fontWeight: 600, color: trackingOrder.status === 'Delivered' ? '#2E7D32' : 'var(--color-text-secondary)', marginBottom: '4px' }}>Delivered</div>
+                      return (
+                        <div key={idx} style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div
+                            style={{
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: isDone ? 'var(--color-brand)' : '#FFFFFF',
+                              border: `3px solid ${isDone ? '#FFFFFF' : '#D1D5DB'}`,
+                              boxShadow: isCurrent ? '0 0 0 3px rgba(226, 1, 113, 0.25)' : (isDone ? '0 0 0 1px var(--color-brand)' : 'none'),
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            {isDone && (
+                              <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} />
+                            )}
+                          </div>
+                          <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontSize: '14px', fontWeight: isDone ? 700 : 500, color: titleColor }}>
+                              {step.title}
+                            </div>
+                            <span style={{ fontSize: '12px', color: isDone ? 'var(--color-brand)' : '#9CA3AF', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {step.time}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-              </div>
+                )
+              })()}
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* CUSTOMER INVOICE & RECEIPT FULL PAGE MODAL */}
+      {invoiceModalOrder && (
+        <FullPageInvoiceModal
+          order={invoiceModalOrder}
+          onClose={() => setInvoiceModalOrder(null)}
+        />
+      )}
 
       {/* ADD ADDRESS MODAL */}
       <AnimatePresence>

@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { LayoutDashboard, ShoppingBag, Box, PlaySquare, Mail, LogOut, Settings, Tag, Images, Lock, ExternalLink } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useAdminPreview } from '../context/AdminPreviewContext'
+import PageBack from './PageBack'
 
 export default function AdminLayout() {
   const { logout, user, isLoggedIn, login } = useAuth()
   const { exitStorePreview, enterStorePreview } = useAdminPreview()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('admin@swarnaa.com')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -137,14 +139,29 @@ export default function AdminLayout() {
     { name: 'Categories', path: '/admin/categories', icon: <Tag size={20} /> },
     { name: 'Products', path: '/admin/products', icon: <Box size={20} /> },
     { name: 'Tutorials', path: '/admin/tutorials', icon: <PlaySquare size={20} /> },
-    { name: 'Hero Images', path: '/admin/hero-images', icon: <Images size={20} /> },
+    { name: 'Home Page & Hero', path: '/admin/hero-images', icon: <Images size={20} /> },
     { name: 'Custom Requests', path: '/admin/requests', icon: <Mail size={20} /> },
   ]
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8F9FA' }}>
-      <div style={{ width: '280px', backgroundColor: 'white', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: '#F8F9FA' }}>
+      {/* Fixed Admin Sidebar */}
+      <aside
+        style={{
+          width: '280px',
+          height: '100vh',
+          backgroundColor: 'white',
+          borderRight: '1px solid var(--color-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          left: 0,
+          zIndex: 100
+        }}
+      >
+        <div style={{ padding: '24px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <img src="/brand-emblem.png" alt="Logo" style={{ width: '40px', height: '40px', objectFit: 'cover' }} />
           <div>
             <h2 style={{ fontFamily: 'Playfair Display', fontSize: '18px', fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Admin Portal</h2>
@@ -152,7 +169,7 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        <nav style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+        <nav style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
           {navItems.map((item) => (
             <NavLink
               key={item.name}
@@ -172,27 +189,7 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        <div style={{ padding: '24px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={openWebsitePreview}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              backgroundColor: 'var(--color-lavender-light)',
-              color: 'var(--color-brand)',
-              border: '1px solid rgba(122, 107, 143, 0.2)',
-              borderRadius: '12px',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <ExternalLink size={18} /> View website
-          </button>
-
+        <div style={{ padding: '24px 16px', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '12px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px' }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-brand)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
               {user?.name?.charAt(0) || 'A'}
@@ -207,13 +204,17 @@ export default function AdminLayout() {
             <LogOut size={20} /> Sign Out
           </button>
         </div>
-      </div>
+      </aside>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <header style={{ height: '72px', backgroundColor: 'white', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', flexShrink: 0 }}>
-          <h1 style={{ fontFamily: 'Playfair Display', fontSize: '24px', color: 'var(--color-text)', margin: 0 }}>
-            Admin Dashboard
-          </h1>
+      {/* Main Content Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
+        <header style={{ height: '72px', backgroundColor: 'white', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', flexShrink: 0, zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', minWidth: 0 }}>
+            {location.pathname !== '/admin' && <PageBack />}
+            <h1 style={{ fontFamily: 'Playfair Display', fontSize: '24px', color: 'var(--color-text)', margin: 0 }}>
+              Admin Dashboard
+            </h1>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"

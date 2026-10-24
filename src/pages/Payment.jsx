@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, CheckCircle, Copy, Smartphone, UploadCloud } from 'lucide-react'
+import { CheckCircle, Copy, Smartphone, UploadCloud } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
 import { useCart } from '../context/CartContext'
@@ -181,20 +181,6 @@ export default function Payment() {
   return (
     <div className="page payment-page">
       <div className="container payment-page__wrap">
-        <ScrollReveal y={10}>
-          <button
-            type="button"
-            className="payment-page__back"
-            onClick={() => navigate('/checkout', {
-              state: isBuyNow
-                ? { buyNowItem: checkoutItems[0] }
-                : undefined,
-            })}
-          >
-            <ArrowLeft size={16} /> Back to checkout
-          </button>
-        </ScrollReveal>
-
         <ScrollReveal y={14} delay={0.03} className="payment-page__head">
           <div>
             <h1 className="payment-page__title">Complete payment</h1>

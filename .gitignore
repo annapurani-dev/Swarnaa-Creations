@@ -28,3 +28,7 @@ npm-debug.log*
 # Prisma
 backend/prisma/*.db
 backend/prisma/*.db-journal
+
+# Local DB dumps (may contain user hashes / data)
+*.sql
+backend/swarnaadb*.sql

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { ArrowLeft, CreditCard, MapPin } from 'lucide-react'
+import { CreditCard, MapPin } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import { useAddresses } from '../context/AddressContext'
@@ -112,16 +112,6 @@ export default function Checkout() {
 
   return (
     <div className="container" style={{ padding: '60px 40px 100px 40px', minHeight: '80vh', maxWidth: '1000px' }}>
-      <ScrollReveal y={14}>
-        <button 
-          type="button"
-          onClick={() => navigate(isBuyNow ? `/shop/${buyNowItem.product?.id}` : '/cart')}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '15px', cursor: 'pointer', marginBottom: '32px' }}
-        >
-          <ArrowLeft size={18} /> {isBuyNow ? 'Back to product' : 'Back to Cart'}
-        </button>
-      </ScrollReveal>
-
       <ScrollReveal y={18} delay={0.04}>
         <h1 style={{ fontFamily: 'Playfair Display', fontSize: '42px', marginBottom: '12px', color: 'var(--color-text)' }}>Secure Checkout</h1>
         {isBuyNow && (

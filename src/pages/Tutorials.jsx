@@ -1,20 +1,30 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Play, FileText, Lock, Unlock, Clock, Star, ArrowRight, Heart } from 'lucide-react'
 import { fetchTutorials, fetchCategories } from '../api'
 import { useWishlist } from '../context/WishlistContext'
+import { useAuth } from '../context/AuthContext'
 import { useLearning } from '../context/LearningContext'
 import { formatCategoryLabel } from '../lib/categories'
 import ScrollReveal from '../components/ScrollReveal'
 
 export default function Tutorials() {
-  const [activeCategory, setActiveCategory] = useState('All')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawFilter = (searchParams.get('filter') || searchParams.get('category') || 'all').toLowerCase()
+  const initialFilter = ['all', 'free', 'paid'].includes(rawFilter) ? rawFilter : 'all'
+  const [activeFilter, setActiveFilter] = useState(initialFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const { toggleWishlist, isInWishlist } = useWishlist()
+  const { isLoggedIn, openLoginModal } = useAuth()
   const { isUnlocked } = useLearning()
 
+  useEffect(() => {
+    const f = (searchParams.get('filter') || searchParams.get('category') || 'all').toLowerCase()
+    setActiveFilter(['all', 'free', 'paid'].includes(f) ? f : 'all')
+  }, [searchParams])
+
   const [tutorials, setTutorials] = useState([])
-  const [categoryNames, setCategoryNames] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,29 +32,28 @@ export default function Tutorials() {
   }, [])
 
   const loadTutorials = async () => {
-    const [data, cats] = await Promise.all([
-      fetchTutorials(),
-      fetchCategories('TUTORIAL').catch(() => []),
-    ])
+    const data = await fetchTutorials()
     setTutorials(data)
-    const fromApi = (Array.isArray(cats) ? cats : []).map((c) => c.name)
-    const fromItems = [...new Set(data.map((t) => t.category).filter(Boolean))]
-    setCategoryNames([...new Set([...fromApi, ...fromItems])])
     setLoading(false)
   }
 
-  const categories = ['All', ...categoryNames]
+  const filterTabs = [
+    { key: 'all', label: 'All' },
+    { key: 'free', label: 'Free' },
+    { key: 'paid', label: 'Paid' },
+  ]
 
   const filteredTutorials = useMemo(() => {
     return tutorials.filter((tut) => {
-      const matchesCategory =
-        activeCategory === 'All' ||
-        tut.category === activeCategory ||
-        formatCategoryLabel(tut.category) === formatCategoryLabel(activeCategory)
+      const price = Number(tut.price) || 0
+      const matchesFilter =
+        activeFilter === 'all' ||
+        (activeFilter === 'free' && price === 0) ||
+        (activeFilter === 'paid' && price > 0)
       const matchesSearch = tut.title.toLowerCase().includes(searchQuery.toLowerCase())
-      return matchesCategory && matchesSearch
+      return matchesFilter && matchesSearch
     })
-  }, [activeCategory, searchQuery, tutorials])
+  }, [activeFilter, searchQuery, tutorials])
 
   return (
     <div className="page">
@@ -71,14 +80,21 @@ export default function Tutorials() {
       <div className="container" style={{ paddingTop: 36, paddingBottom: 80 }}>
         <ScrollReveal style={{ marginBottom: 40 }} y={14}>
           <div className="chip-row">
-            {categories.map((category) => (
+            {filterTabs.map((tab) => (
               <button
-                key={category}
+                key={tab.key}
                 type="button"
-                className={`chip${activeCategory === category ? ' is-active' : ''}`}
-                onClick={() => setActiveCategory(category)}
+                className={`chip${activeFilter === tab.key ? ' is-active' : ''}`}
+                onClick={() => {
+                  setActiveFilter(tab.key)
+                  if (tab.key === 'all') {
+                    setSearchParams({})
+                  } else {
+                    setSearchParams({ filter: tab.key })
+                  }
+                }}
               >
-                {activeCategory === category && (
+                {activeFilter === tab.key && (
                   <motion.div
                     layoutId="categoryIndicator"
                     style={{
@@ -89,7 +105,7 @@ export default function Tutorials() {
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   />
                 )}
-                {category === 'All' ? 'All' : formatCategoryLabel(category)}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -127,11 +143,23 @@ export default function Tutorials() {
                   <div className="tutorial-card__meta">
                     <button
                       type="button"
-                      className="tutorial-card__wish"
-                      onClick={(e) => { e.stopPropagation(); toggleWishlist(tut); }}
+                      className={`tutorial-card__wish ${isInWishlist(tut.id) ? 'is-active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (!isLoggedIn) {
+                          openLoginModal(() => toggleWishlist(tut))
+                        } else {
+                          toggleWishlist(tut)
+                        }
+                      }}
                       aria-label="Wishlist"
                     >
-                      <Heart size={14} fill={isInWishlist(tut.id) ? 'currentColor' : 'none'} />
+                      <Heart
+                        size={14}
+                        color={isInWishlist(tut.id) ? 'var(--color-brand)' : 'var(--color-text-secondary)'}
+                        fill={isInWishlist(tut.id) ? 'var(--color-brand)' : 'none'}
+                        strokeWidth={isInWishlist(tut.id) ? 2 : 1.5}
+                      />
                     </button>
                     <span><Star size={13} color="#F59E0B" fill="#F59E0B" /> {tut.level}</span>
                     <span><Clock size={13} /> {tut.duration}</span>

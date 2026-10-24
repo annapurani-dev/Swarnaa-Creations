@@ -86,13 +86,42 @@ export const fetchProducts = async () => {
   }
 };
 
+export const fetchProductById = async (id) => {
+  try {
+    const response = await fetch(`${API_URL}/products/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch product');
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
+};
+
 export const createProduct = async (data) => {
-  const response = await apiFetch('/products', {
+  const isFormData = data instanceof FormData;
+  const options = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+    body: isFormData ? data : JSON.stringify(data),
+  };
+  if (!isFormData) {
+    options.headers = { 'Content-Type': 'application/json' };
+  }
+  const response = await apiFetch('/products', options);
   if (!response.ok) throw new Error(await readError(response, 'Failed to create product'));
+  return response.json();
+};
+
+export const updateProduct = async (id, data) => {
+  const isFormData = data instanceof FormData;
+  const options = {
+    method: 'PUT',
+    body: isFormData ? data : JSON.stringify(data),
+  };
+  if (!isFormData) {
+    options.headers = { 'Content-Type': 'application/json' };
+  }
+  const response = await apiFetch(`/products/${id}`, options);
+  if (!response.ok) throw new Error(await readError(response, 'Failed to update product'));
   return response.json();
 };
 
@@ -179,12 +208,30 @@ export const fetchJournal = async (id) => {
 };
 
 export const createTutorial = async (data) => {
-  const response = await apiFetch('/tutorials', {
+  const isFormData = data instanceof FormData;
+  const options = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+    body: isFormData ? data : JSON.stringify(data),
+  };
+  if (!isFormData) {
+    options.headers = { 'Content-Type': 'application/json' };
+  }
+  const response = await apiFetch('/tutorials', options);
   if (!response.ok) throw new Error(await readError(response, 'Failed to create tutorial'));
+  return response.json();
+};
+
+export const updateTutorial = async (id, data) => {
+  const isFormData = data instanceof FormData;
+  const options = {
+    method: 'PUT',
+    body: isFormData ? data : JSON.stringify(data),
+  };
+  if (!isFormData) {
+    options.headers = { 'Content-Type': 'application/json' };
+  }
+  const response = await apiFetch(`/tutorials/${id}`, options);
+  if (!response.ok) throw new Error(await readError(response, 'Failed to update tutorial'));
   return response.json();
 };
 
@@ -312,3 +359,84 @@ export const deleteHeroImage = async (id) => {
   const response = await fetch(`${API_URL}/hero-images/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to delete hero image');
 };
+
+export const fetchHomeContent = async () => {
+  try {
+    const response = await fetch(`${API_URL}/home-content`);
+    if (!response.ok) throw new Error('Failed to fetch home content');
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
+};
+
+export const updateHomeContent = async (content) => {
+  try {
+    const response = await fetch(`${API_URL}/home-content`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(content),
+    });
+    if (!response.ok) throw new Error('Failed to update home content');
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+export const fetchCustomRequests = async () => {
+  try {
+    const response = await fetch(`${API_URL}/custom-requests`);
+    if (!response.ok) throw new Error('Failed to fetch custom requests');
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    return [];
+  }
+};
+
+export const submitCustomRequest = async (formData) => {
+  const response = await fetch(`${API_URL}/custom-requests`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to submit custom commission request');
+  }
+  return await response.json();
+};
+
+export const updateCustomRequestStatus = async (id, status) => {
+  const response = await fetch(`${API_URL}/custom-requests/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!response.ok) throw new Error('Failed to update status');
+  return await response.json();
+};
+
+export const quoteCustomRequest = async (id, { quotedAmount, adminNotes }) => {
+  const response = await fetch(`${API_URL}/custom-requests/${id}/quote`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quotedAmount, adminNotes }),
+  });
+  if (!response.ok) throw new Error('Failed to save quote');
+  return await response.json();
+};
+
+export const uploadCustomRequestPaymentProof = async (id, file) => {
+  const formData = new FormData();
+  formData.append('paymentProof', file);
+  const response = await fetch(`${API_URL}/custom-requests/${id}/payment-proof`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) throw new Error('Failed to upload payment proof');
+  return await response.json();
+};
+
