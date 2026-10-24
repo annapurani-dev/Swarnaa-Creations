@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql" // Prisma uses 'mysql' provider for both MySQL and MariaDB
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int       @id @default(autoincrement())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  phone            String?
+  role             String    @default("CUSTOMER")
+  resetCode        String?
+  resetCodeExpires DateTime?
+  orders           Order[] // ADMIN or CUSTOMER
+  createdAt        DateTime  @default(now())
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  type      String // "PRODUCT" or "TUTORIAL"
+  products  Product[]
+  tutorials Tutorial[]
+
+  @@unique([name, type])
+}
+
+model Product {
+  id         Int         @id @default(autoincrement())
+  name       String
+  price      Float
+  stock      Int         @default(0)
+  image      String?
+  category   Category    @relation(fields: [categoryId], references: [id])
+  categoryId Int
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  OrderItem  OrderItem[]
+}
+
+model Tutorial {
+  id          Int         @id @default(autoincrement())
+  title       String
+  description String?     @db.Text
+  price       Float       @default(0)
+  isFree      Boolean     @default(false)
+  videoUrl    String?
+  image       String?
+  level       String? // Beginner | Intermediate | Advanced
+  type        String? // Video | Text & Images
+  duration    String?
+  materials   String?     @db.Text // JSON array
+  steps       String?     @db.Text // JSON array
+  category    Category    @relation(fields: [categoryId], references: [id])
+  categoryId  Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  OrderItem   OrderItem[]
+}
+
+model JournalPost {
+  id          Int      @id @default(autoincrement())
+  title       String
+  lead        String?  @db.Text
+  body        String?  @db.Text
+  image       String?
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Order {
+  id                   Int         @id @default(autoincrement())
+  userId               Int?
+  user                 User?       @relation(fields: [userId], references: [id])
+  customerName         String
+  customerEmail        String
+  customerPhone        String?
+  shippingAddress      String?     @db.Text
+  shippingCity         String?
+  shippingState        String?
+  shippingPincode      String?
+  totalAmount          Float
+  status               String      @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, PAID, SHIPPED, DELIVERED
+  paymentScreenshotUrl String?
+  items                OrderItem[]
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+}
+
+model OrderItem {
+  id         Int       @id @default(autoincrement())
+  orderId    Int
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  Int?
+  product    Product?  @relation(fields: [productId], references: [id])
+  tutorialId Int?
+  tutorial   Tutorial? @relation(fields: [tutorialId], references: [id])
+  quantity   Int       @default(1)
+  price      Float
+}
+
+model HeroImage {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  side      String // "LEFT" | "RIGHT"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
