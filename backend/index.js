@@ -1540,6 +1540,24 @@ app.patch('/api/custom-requests/:id/status', async (req, res) => {
 
 
 
+// Serve frontend static build if available
+const frontendDistPath = path.join(__dirname, '../dist');
+app.use(express.static(frontendDistPath));
+
+// SPA fallback: any request not handled by previous routes serves index.html
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return next();
+  }
+  const indexPath = path.join(frontendDistPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(404).send('Frontend not built. Please run "npm run build".');
+    }
+  });
+});
+
 const PORT = process.env.PORT || 3001;
 
 ensureDefaultAdmin()
